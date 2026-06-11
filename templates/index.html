@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CovertDNS - Quantum-Safe DNS Tunnel</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🕵️ CovertDNS Tunnel</h1>
+            <p class="subtitle">Quantum-Safe DNS Tunneling with Kyber-768 + AES-256</p>
+            
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="status-label">📡 DNS Port:</span>
+                    <span class="status-value" id="port-status">53</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">🌐 Domain:</span>
+                    <span class="status-value" id="domain-status">covert.local</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">🔐 Receiver:</span>
+                    <span class="status-value" id="receiver-status">Stopped</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">💬 Messages:</span>
+                    <span class="status-value" id="message-count">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 1: Key Management -->
+        <div class="card step-card">
+            <div class="step-number">1</div>
+            <div class="card-header">
+                <span class="icon">🔑</span>
+                <h2>Key Management</h2>
+                <span class="step-badge">First Step</span>
+            </div>
+            <div class="card-body">
+                <div class="button-group">
+                    <button class="btn btn-primary" id="genkeys-btn">
+                        <span class="btn-icon">✨</span> Generate New Keys
+                    </button>
+                    <button class="btn btn-secondary" id="loadkeys-btn">
+                        <span class="btn-icon">📂</span> Load Existing Keys
+                    </button>
+                </div>
+                <div class="key-display">
+                    <div class="key-item">
+                        <label>📤 Public Key (Share with senders):</label>
+                        <div class="key-value" id="public-key-display">Not loaded</div>
+                    </div>
+                    <div class="key-item">
+                        <label>📥 Private Key (Keep secret - for receiver):</label>
+                        <div class="key-value" id="private-key-display">Not loaded</div>
+                    </div>
+                </div>
+                <div class="info-box">
+                    💡 <strong>Tip:</strong> Generate keys first! Private key goes to receiver terminal.
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: DNS Receiver Control -->
+        <div class="card step-card">
+            <div class="step-number">2</div>
+            <div class="card-header">
+                <span class="icon">📡</span>
+                <h2>DNS Receiver</h2>
+                <span class="step-badge">Must be Running</span>
+            </div>
+            <div class="card-body">
+                <div class="receiver-config">
+                    <div class="input-group">
+                        <label>🔑 Private Key (Base64):</label>
+                        <textarea id="private-key-input" placeholder="Paste private key from step 1 or leave empty for plain text"></textarea>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-success" id="start-receiver-btn">
+                        <span class="btn-icon">▶️</span> Start Receiver
+                    </button>
+                    <button class="btn btn-danger" id="stop-receiver-btn">
+                        <span class="btn-icon">⏹️</span> Stop Receiver
+                    </button>
+                </div>
+                <div class="info-box info-warning">
+                    ⚠️ <strong>Important:</strong> Receiver needs Administrator privileges!
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3: Stealth Mode Selection -->
+        <div class="card step-card">
+            <div class="step-number">3</div>
+            <div class="card-header">
+                <span class="icon">🕵️</span>
+                <h2>Stealth Mode Configuration</h2>
+                <span class="step-badge">Anti-Detection</span>
+            </div>
+            <div class="card-body">
+                <div class="stealth-options">
+                    <div class="stealth-card" data-stealth="off">
+                        <div class="stealth-icon">🔓</div>
+                        <div class="stealth-title">Normal Mode</div>
+                        <div class="stealth-desc">Simple random delays, no background traffic</div>
+                        <div class="stealth-features">
+                            <span>✅ Fast</span>
+                            <span>⚠️ Detectable</span>
+                        </div>
+                        <div class="stealth-select">Select</div>
+                    </div>
+                    
+                    <div class="stealth-card" data-stealth="low">
+                        <div class="stealth-icon">🕵️</div>
+                        <div class="stealth-title">Low Stealth</div>
+                        <div class="stealth-desc">Minimal background DNS queries</div>
+                        <div class="stealth-features">
+                            <span>✅ Light traffic</span>
+                            <span>✅ Harder to detect</span>
+                        </div>
+                        <div class="stealth-select">Select</div>
+                    </div>
+                    
+                    <div class="stealth-card active" data-stealth="normal">
+                        <div class="stealth-icon">🕵️‍♂️</div>
+                        <div class="stealth-title">Normal Stealth</div>
+                        <div class="stealth-desc">Balanced - Human-like delays + real DNS queries</div>
+                        <div class="stealth-features">
+                            <span>✅ Recommended</span>
+                            <span>✅ Human-like behavior</span>
+                        </div>
+                        <div class="stealth-select">Selected ✓</div>
+                    </div>
+                    
+                    <div class="stealth-card" data-stealth="high">
+                        <div class="stealth-icon">👻</div>
+                        <div class="stealth-title">High Stealth</div>
+                        <div class="stealth-desc">Aggressive masking, frequent background queries</div>
+                        <div class="stealth-features">
+                            <span>✅ Very hard to detect</span>
+                            <span>⚠️ More traffic</span>
+                        </div>
+                        <div class="stealth-select">Select</div>
+                    </div>
+                    
+                    <div class="stealth-card" data-stealth="stealth">
+                        <div class="stealth-icon">💀</div>
+                        <div class="stealth-title">Maximum Stealth</div>
+                        <div class="stealth-desc">Extreme - Maximum background traffic + random patterns</div>
+                        <div class="stealth-features">
+                            <span>✅ Nearly invisible</span>
+                            <span>⚠️ High bandwidth</span>
+                        </div>
+                        <div class="stealth-select">Select</div>
+                    </div>
+                </div>
+                <div class="info-box">
+                    🕵️ <strong>Stealth Mode:</strong> Simulates real DNS traffic (google.com, wechat.com, etc.) to hide your tunnel.
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 4: DNS Sender Configuration -->
+        <div class="card step-card">
+            <div class="step-number">4</div>
+            <div class="card-header">
+                <span class="icon">📤</span>
+                <h2>DNS Sender</h2>
+                <span class="step-badge">Send Messages</span>
+            </div>
+            <div class="card-body">
+                <div class="input-group">
+                    <label>🎯 Target IP Address:</label>
+                    <input type="text" id="target-ip" placeholder="127.0.0.1" value="127.0.0.1">
+                </div>
+                <div class="input-group">
+                    <label>📤 Public Key (from step 1):</label>
+                    <textarea id="public-key-input" placeholder="Paste public key for encryption"></textarea>
+                </div>
+                
+                <!-- Encryption Options -->
+                <div class="encryption-options">
+                    <label>🔐 Encryption Mode:</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="encrypt" value="encrypted" checked> 
+                            <span class="radio-icon">🔒</span> Encrypted (Kyber-768 + AES-256)
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="encrypt" value="plain"> 
+                            <span class="radio-icon">🔓</span> Plain (Base64 only - Faster)
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 5: Send Message -->
+        <div class="card step-card">
+            <div class="step-number">5</div>
+            <div class="card-header">
+                <span class="icon">💬</span>
+                <h2>Send Message</h2>
+                <span class="step-badge">Text or Voice</span>
+            </div>
+            <div class="card-body">
+                <!-- Text Message -->
+                <div class="message-section">
+                    <h3>📝 Text Message</h3>
+                    <div class="input-group">
+                        <textarea id="text-message" rows="3" placeholder="Type your secret message here..."></textarea>
+                    </div>
+                    <button class="btn btn-primary" id="send-text-btn">
+                        <span class="btn-icon">📨</span> Send Text Message
+                    </button>
+                </div>
+
+                <!-- Voice Message -->
+                <div class="message-section">
+                    <h3>🎤 Voice Message</h3>
+                    <div class="voice-controls">
+                        <button class="btn btn-secondary" id="record-btn">
+                            <span class="btn-icon">🎙️</span> Record (5 sec)
+                        </button>
+                        <button class="btn btn-secondary" id="record-fast-btn">
+                            <span class="btn-icon">⚡</span> Record (1 sec - Fast)
+                        </button>
+                        <audio id="audio-preview" controls style="display: none;"></audio>
+                    </div>
+                    <button class="btn btn-primary" id="send-voice-btn" disabled>
+                        <span class="btn-icon">🎵</span> Send Voice Message
+                    </button>
+                </div>
+
+                <!-- Send Progress -->
+                <div class="send-progress" id="send-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="send-progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="send-progress-text"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 6: Message History -->
+        <div class="card step-card">
+            <div class="step-number">6</div>
+            <div class="card-header">
+                <span class="icon">📋</span>
+                <h2>Message History</h2>
+                <span class="step-badge">Logs</span>
+                <button class="btn-small" id="clear-history-btn">Clear</button>
+            </div>
+            <div class="card-body">
+                <div class="message-list" id="message-list">
+                    <div class="empty-message">No messages yet. Follow steps 1-5 to send your first message...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Reference -->
+        <div class="card">
+            <div class="card-header">
+                <span class="icon">📖</span>
+                <h2>Quick Reference</h2>
+            </div>
+            <div class="card-body">
+                <div class="quick-steps">
+                    <div class="quick-step">
+                        <span class="quick-num">1</span>
+                        <span>Generate Keys</span>
+                        <span class="quick-arrow">→</span>
+                    </div>
+                    <div class="quick-step">
+                        <span class="quick-num">2</span>
+                        <span>Start Receiver (Admin)</span>
+                        <span class="quick-arrow">→</span>
+                    </div>
+                    <div class="quick-step">
+                        <span class="quick-num">3</span>
+                        <span>Choose Stealth Mode</span>
+                        <span class="quick-arrow">→</span>
+                    </div>
+                    <div class="quick-step">
+                        <span class="quick-num">4</span>
+                        <span>Enter Target & Keys</span>
+                        <span class="quick-arrow">→</span>
+                    </div>
+                    <div class="quick-step">
+                        <span class="quick-num">5</span>
+                        <span>Send Message!</span>
+                        <span class="quick-arrow">✓</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
