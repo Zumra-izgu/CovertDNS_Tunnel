@@ -3,6 +3,7 @@
 CovertDNS - Web Interface
 DNS Tunnel Management with Real-time Monitoring
 """
+
 import socket
 import threading
 import time
@@ -11,10 +12,7 @@ import os
 import sys
 import json
 from datetime import datetime
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from flask_socketio import SocketIO, emit
 import eventlet
 
@@ -24,6 +22,16 @@ eventlet.monkey_patch()
 from dns_tunnel import DNSSender, DNSReceiver, generate_keys, VoiceMessageHandler
 from encryption.hybrid_crypto import HybridCrypto
 from shared.constants import DNS_PORT, BASE_DOMAIN, MAX_CHUNK_SIZE
+
+# Stealth module import
+STEALTH_AVAILABLE = False
+StealthDNSEngine = None
+try:
+    from stealth.traffic_simulator import StealthDNSEngine, HumanBehaviorSimulator
+    STEALTH_AVAILABLE = True
+    print("🕵️ Stealth module loaded in web interface")
+except ImportError:
+    print("⚠️ Stealth module not available in web interface")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'covertdns-secret-key'
@@ -35,99 +43,119 @@ receiver_thread = None
 is_receiving = False
 message_history = []
 current_keys = {"public": None, "private": None}
+voice_files = {}  # Store voice file paths with IDs
 
 
 class WebDNSReceiver(DNSReceiver):
     def __init__(self, private_key_b64=None):
         super().__init__(private_key_b64)
     
-    def _try_reassemble(self, client_ip):
-        msg_data = self.messages.get(client_ip)
-        if not msg_data:
+    # web_interface.py içinde WebDNSReceiver sınıfının _try_reassemble metodunu değiştir
+
+def _try_reassemble(self, client_ip):
+    msg_data = self.messages.get(client_ip)
+    if not msg_data:
+        return
+    
+    chunks = msg_data['chunks']
+    total_chunks = msg_data.get('total_chunks')
+    
+    sorted_seqs = sorted(chunks.keys())
+    expected = 1
+    collected = []
+    
+    for seq in sorted_seqs:
+        if seq == expected:
+            collected.append(chunks[seq])
+            expected += 1
+        else:
             return
-        
-        chunks = msg_data['chunks']
-        total_chunks = msg_data.get('total_chunks')
-        
-        sorted_seqs = sorted(chunks.keys())
-        expected = 1
-        collected = []
-        
-        for seq in sorted_seqs:
-            if seq == expected:
-                collected.append(chunks[seq])
-                expected += 1
+    
+    if total_chunks and len(collected) != total_chunks:
+        return
+    
+    if len(collected) > 0:
+        try:
+            encoded = ''.join(collected)
+            
+            socketio.emit('chunk_progress', {
+                'client': client_ip,
+                'received': len(collected),
+                'total': total_chunks or len(collected),
+                'complete': True
+            })
+            
+            decrypted = None
+            if self.private_key:
+                try:
+                    decrypted = HybridCrypto.decrypt_from_dns(encoded, self.private_key)
+                except:
+                    pass
+            
+            if decrypted is None:
+                try:
+                    decrypted = base64.b64decode(encoded).decode()
+                except:
+                    decrypted = encoded
+            
+            if decrypted.startswith("VOICE:"):
+                audio_b64 = decrypted[6:]
+                audio_bytes = base64.b64decode(audio_b64)
+                
+                # Daha basit voice ID oluştur (hash hatasını düzelt)
+                import time
+                voice_id = f"voice_{int(time.time()*1000)}"
+                
+                # Ses dosyasını kaydet
+                filename = f"voice_{int(time.time())}.wav"
+                filepath = os.path.join('received_voices', filename)
+                with open(filepath, 'wb') as f:
+                    f.write(audio_bytes)
+                
+                # Global değişkene kaydet
+                global voice_files
+                voice_files[voice_id] = filepath
+                
+                print(f"🎤 Voice saved: {filepath} (ID: {voice_id})")  # Debug
+                
+                message_data = {
+                    'type': 'voice',
+                    'from': client_ip,
+                    'size': len(audio_bytes),
+                    'voice_id': voice_id,
+                    'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'message': f'Voice message - {len(audio_bytes)} bytes',
+                    'duration': len(audio_bytes) / 16000  # Yaklaşık süre
+                }
+            elif decrypted.startswith("TEXT:"):
+                text_content = decrypted[5:]
+                message_data = {
+                    'type': 'text',
+                    'from': client_ip,
+                    'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'message': text_content,
+                    'chunks': len(collected)
+                }
             else:
-                return
-        
-        if total_chunks and len(collected) != total_chunks:
-            return
-        
-        if len(collected) > 0:
-            try:
-                encoded = ''.join(collected)
-                
-                socketio.emit('chunk_progress', {
-                    'client': client_ip,
-                    'received': len(collected),
-                    'total': total_chunks or len(collected),
-                    'complete': True
-                })
-                
-                decrypted = None
-                if self.private_key:
-                    try:
-                        decrypted = HybridCrypto.decrypt_from_dns(encoded, self.private_key)
-                    except:
-                        pass
-                
-                if decrypted is None:
-                    try:
-                        decrypted = base64.b64decode(encoded).decode()
-                    except:
-                        decrypted = encoded
-                
-                if decrypted.startswith("VOICE:"):
-                    audio_b64 = decrypted[6:]
-                    audio_bytes = base64.b64decode(audio_b64)
-                    filepath = VoiceMessageHandler.save_audio(audio_bytes)
-                    
-                    message_data = {
-                        'type': 'voice',
-                        'from': client_ip,
-                        'size': len(audio_bytes),
-                        'file': filepath,
-                        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'message': f'[Voice message - {len(audio_bytes)} bytes]'
-                    }
-                elif decrypted.startswith("TEXT:"):
-                    text_content = decrypted[5:]
-                    message_data = {
-                        'type': 'text',
-                        'from': client_ip,
-                        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'message': text_content,
-                        'chunks': len(collected)
-                    }
-                else:
-                    message_data = {
-                        'type': 'text',
-                        'from': client_ip,
-                        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'message': decrypted,
-                        'chunks': len(collected)
-                    }
-                
-                global message_history
-                message_history.insert(0, message_data)
-                if len(message_history) > 100:
-                    message_history = message_history[:100]
-                
-                socketio.emit('new_message', message_data)
-                del self.messages[client_ip]
-                
-            except Exception as e:
-                socketio.emit('error', {'message': f'Reassembly error: {str(e)}'})
+                message_data = {
+                    'type': 'text',
+                    'from': client_ip,
+                    'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'message': decrypted,
+                    'chunks': len(collected)
+                }
+            
+            global message_history
+            message_history.insert(0, message_data)
+            if len(message_history) > 100:
+                message_history = message_history[:100]
+            
+            socketio.emit('new_message', message_data)
+            del self.messages[client_ip]
+            
+        except Exception as e:
+            socketio.emit('error', {'message': f'Reassembly error: {str(e)}'})
+            print(f"Error: {e}")
     
     def _handle_dns_packet(self, data: bytes, addr: tuple):
         try:
@@ -301,13 +329,29 @@ def api_send_message():
     message = data.get('message', '')
     encrypt = data.get('encrypt', True)
     public_key = data.get('public_key', None)
+    stealth_mode = data.get('stealth_mode', 'normal')
     
     if not message:
         return jsonify({'success': False, 'error': 'No message provided'})
     
     try:
         sender = WebDNSSender(target_ip, public_key if public_key else None)
+        
+        # Set stealth mode if available
+        if stealth_mode != 'off' and STEALTH_AVAILABLE and StealthDNSEngine:
+            try:
+                stealth_engine = StealthDNSEngine()
+                stealth_engine.start_stealth_mode(stealth_mode)
+                sender.set_stealth_engine(stealth_engine)
+            except Exception as e:
+                print(f"Stealth error: {e}")
+        
         success = sender.send_text_message(message, encrypt=encrypt)
+        
+        # Stop stealth engine
+        if hasattr(sender, 'stealth_engine') and sender.stealth_engine:
+            sender.stealth_engine.stop_stealth_mode()
+        
         sender.close()
         
         if success:
@@ -315,6 +359,7 @@ def api_send_message():
                 'target': target_ip,
                 'message': message[:100] + '...' if len(message) > 100 else message,
                 'encrypted': encrypt,
+                'stealth_mode': stealth_mode,
                 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             })
             return jsonify({'success': True})
@@ -331,6 +376,7 @@ def api_send_voice():
     audio_base64 = data.get('audio', '')
     encrypt = data.get('encrypt', True)
     public_key = data.get('public_key', None)
+    stealth_mode = data.get('stealth_mode', 'normal')
     
     if not audio_base64:
         return jsonify({'success': False, 'error': 'No audio provided'})
@@ -338,7 +384,22 @@ def api_send_voice():
     try:
         audio_bytes = base64.b64decode(audio_base64)
         sender = WebDNSSender(target_ip, public_key if public_key else None)
+        
+        # Set stealth mode if available
+        if stealth_mode != 'off' and STEALTH_AVAILABLE and StealthDNSEngine:
+            try:
+                stealth_engine = StealthDNSEngine()
+                stealth_engine.start_stealth_mode(stealth_mode)
+                sender.set_stealth_engine(stealth_engine)
+            except Exception as e:
+                print(f"Stealth error: {e}")
+        
         success = sender.send_voice_message(audio_bytes, encrypt=encrypt)
+        
+        # Stop stealth engine
+        if hasattr(sender, 'stealth_engine') and sender.stealth_engine:
+            sender.stealth_engine.stop_stealth_mode()
+        
         sender.close()
         
         if success:
@@ -346,6 +407,7 @@ def api_send_voice():
                 'target': target_ip,
                 'message': '[Voice message]',
                 'encrypted': encrypt,
+                'stealth_mode': stealth_mode,
                 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             })
             return jsonify({'success': True})
@@ -353,6 +415,21 @@ def api_send_voice():
             return jsonify({'success': False, 'error': 'Send failed'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/download/<voice_id>')
+def api_download_voice(voice_id):
+    """Download voice message file"""
+    if voice_id in voice_files:
+        filepath = voice_files[voice_id]
+        if os.path.exists(filepath):
+            return send_file(
+                filepath,
+                as_attachment=True,
+                download_name=os.path.basename(filepath),
+                mimetype='audio/wav'
+            )
+    return jsonify({'error': 'File not found'}), 404
 
 
 @app.route('/api/history', methods=['GET'])
@@ -383,5 +460,10 @@ if __name__ == '__main__':
     print(f"\n📍 Web UI: http://localhost:5000")
     print(f"📍 DNS Port: {DNS_PORT}")
     print(f"📍 Domain: {BASE_DOMAIN}")
+    print(f"📍 Voice files will be downloadable from web UI")
+    if STEALTH_AVAILABLE:
+        print("🕵️ Stealth mode available")
+    else:
+        print("⚠️ Stealth mode not available (install stealth module)")
     
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, use_reloader=False)

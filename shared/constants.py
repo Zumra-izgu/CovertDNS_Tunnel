@@ -1,14 +1,14 @@
 """
-Shared Constants for DNS Tunnel
+Shared Constants for DNS Tunnel - Port 53 Support
 """
 
 import os
 import platform
-import ipaddress
+import sys
 
-# DNS Configuration
+# DNS Configuration - PORT 53 KULLANIMI
 DNS_PORT = 53
-FALLBACK_PORTS = [5353, 5354, 5355]
+FALLBACK_PORTS = [5353, 5354, 5355]  # 53 tutmazsa dene
 BASE_DOMAIN = "covert.local"
 MAX_CHUNK_SIZE = 45
 MIN_CHUNK_SIZE = 20
@@ -18,33 +18,13 @@ MIN_DELAY_MS = 100
 MAX_DELAY_MS = 800
 JITTER = True
 
-# Security - IP Whitelist (Güvenli)
-# Özel ağ aralıkları + ihtiyaç duyulan spesifik IP'ler
+# Security - Özelleştirilebilir
 ALLOWED_SENDER_IPS = {
-    # Local
     '127.0.0.1',
+    '0.0.0.0',
     '::1',
-    
-    # Özel ağlar (RFC 1918)
-    '10.0.0.0/8',           # 10.0.0.0 - 10.255.255.255
-    '172.16.0.0/12',        # 172.16.0.0 - 172.31.255.255
-    '192.168.0.0/16',       # 192.168.0.0 - 192.168.255.255
-    
-    # CGNAT (Carrier-grade NAT) - VPN'ler ve mobil ağlar için
-    '100.64.0.0/10',        # 100.64.0.0 - 100.127.255.255
-    
-    # Link-local
-    '169.254.0.0/16',       # Otomatik IP (DHCP yoksa)
+    '192.168.1.0/24',
 }
-
-# Manuel eklenen spesifik IP'ler (opsiyonel)
-MANUAL_ALLOWED_IPS = [
-    # '100.81.116.129',  # İhtiyaç varsa buraya ekle
-]
-
-# Birleştir
-for ip in MANUAL_ALLOWED_IPS:
-    ALLOWED_SENDER_IPS.add(ip)
 
 # Rate Limiting
 MAX_PACKETS_PER_SECOND = 10
@@ -57,10 +37,11 @@ IS_MAC = platform.system() == 'Darwin'
 IS_ADMIN = False
 
 # Port 53 özel ayarları
-USE_RAW_SOCKET = IS_WINDOWS
-BYPASS_MDNS_CONFLICT = True
+USE_RAW_SOCKET = IS_WINDOWS  # Windows'ta raw socket dene
+BYPASS_MDNS_CONFLICT = True   # mDNS çakışmasını dene
 
 def check_admin():
+    """Administrator yetkisi kontrolü"""
     global IS_ADMIN
     if IS_WINDOWS:
         try:
@@ -72,6 +53,7 @@ def check_admin():
         IS_ADMIN = os.geteuid() == 0
     return IS_ADMIN
 
+# Admin kontrolü
 check_admin()
 
 # Crypto

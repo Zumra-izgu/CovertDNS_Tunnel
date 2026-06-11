@@ -21,19 +21,13 @@ const clearHistoryBtn = document.getElementById('clear-history-btn');
 // Stealth mode selection
 document.querySelectorAll('.stealth-card').forEach(card => {
     card.addEventListener('click', () => {
-        // Remove active class from all
         document.querySelectorAll('.stealth-card').forEach(c => c.classList.remove('active'));
-        // Add active to clicked
         card.classList.add('active');
-        // Update selected text
         card.querySelectorAll('.stealth-select').forEach(s => s.textContent = 'Selected ✓');
         document.querySelectorAll('.stealth-card:not(.active) .stealth-select').forEach(s => s.textContent = 'Select');
         
-        // Store selected mode
         currentStealthMode = card.getAttribute('data-stealth');
         console.log('Stealth mode changed to:', currentStealthMode);
-        
-        // Show notification
         showNotification(`Stealth mode: ${card.querySelector('.stealth-title').textContent}`, 'info');
     });
 });
@@ -43,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStatus();
     loadHistory();
     
-    // Copy command buttons
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const cmd = btn.getAttribute('data-cmd');
@@ -75,6 +68,11 @@ socket.on('new_message', (data) => {
     addMessageToHistory(data);
     updateMessageCount();
     showNotification(`New ${data.type} message received!`, 'info');
+    
+    // If voice message, play automatically
+    if (data.type === 'voice' && data.voice_id) {
+        playVoiceMessage(data.voice_id);
+    }
 });
 
 socket.on('message_sent', (data) => {
@@ -85,7 +83,8 @@ socket.on('message_sent', (data) => {
         to: data.target,
         message: data.message,
         time: data.time,
-        encrypted: data.encrypted
+        encrypted: data.encrypted,
+        stealth_mode: data.stealth_mode
     });
 });
 
@@ -185,7 +184,7 @@ stopReceiverBtn.addEventListener('click', async () => {
     }
 });
 
-// Send Text Message with Stealth mode
+// Send Text Message
 sendTextBtn.addEventListener('click', async () => {
     const targetIP = document.getElementById('target-ip').value;
     const message = document.getElementById('text-message').value;
@@ -230,9 +229,6 @@ sendTextBtn.addEventListener('click', async () => {
 });
 
 // Voice Recording
-recordBtn.addEventListener('click', () => startRecording(5000));
-recordFastBtn.addEventListener('click', () => startRecording(1000));
-
 async function startRecording(duration) {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -273,6 +269,9 @@ async function startRecording(duration) {
         showNotification('Microphone access denied! Please check permissions.', 'error');
     }
 }
+
+recordBtn.addEventListener('click', () => startRecording(5000));
+recordFastBtn.addEventListener('click', () => startRecording(1000));
 
 sendVoiceBtn.addEventListener('click', async () => {
     if (!window.currentAudioBase64) {
@@ -318,6 +317,19 @@ sendVoiceBtn.addEventListener('click', async () => {
     }
 });
 
+// Play voice message
+function playVoiceMessage(voiceId) {
+    const audioUrl = `/api/download/${voiceId}`;
+    const audio = new Audio(audioUrl);
+    audio.play().catch(e => console.log('Auto-play blocked:', e));
+}
+
+// Download voice message
+async function downloadVoiceMessage(voiceId) {
+    window.location.href = `/api/download/${voiceId}`;
+    showNotification('Download started!', 'success');
+}
+
 // Clear History
 clearHistoryBtn.addEventListener('click', () => {
     document.getElementById('message-list').innerHTML = '<div class="empty-message">No messages yet. Follow steps 1-5 to send your first message...</div>';
@@ -337,6 +349,28 @@ function addMessageToHistory(data) {
     const isSent = data.type === 'sent';
     const typeClass = data.type === 'voice' ? 'voice' : 'text';
     
+    // Debug için console.log
+    console.log('Adding message:', data);
+    
+    let actionButtons = '';
+    if (data.type === 'voice' && data.voice_id) {
+        actionButtons = `
+            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="playVoice('${data.voice_id}')" class="btn-small" style="background: #00ff9d20; cursor: pointer;">
+                    ▶️ Play
+                </button>
+                <button onclick="downloadVoice('${data.voice_id}')" class="btn-small" style="background: #00ff9d20; cursor: pointer;">
+                    💾 Download
+                </button>
+            </div>
+        `;
+    }
+    
+    let durationInfo = '';
+    if (data.duration) {
+        durationInfo = `<div style="font-size:0.7em; color:#888;">⏱️ Duration: ${data.duration.toFixed(1)} seconds</div>`;
+    }
+    
     messageEl.innerHTML = `
         <div class="message-header">
             <span class="message-type ${typeClass}">${isSent ? '📤 SENT' : (data.type === 'voice' ? '🎤 VOICE' : '📝 TEXT')}</span>
@@ -346,14 +380,65 @@ function addMessageToHistory(data) {
         </div>
         <div class="message-content">${data.message || data.text || '[Message]'}</div>
         ${data.encrypted !== undefined ? `<div style="font-size:0.7em; color:#888; margin-top:5px;">🔐 ${data.encrypted ? 'Encrypted (Kyber-768)' : 'Plain text'}</div>` : ''}
+        ${data.stealth_mode ? `<div style="font-size:0.7em; color:#888;">🕵️ Stealth: ${data.stealth_mode}</div>` : ''}
         ${data.size ? `<div style="font-size:0.7em; color:#888;">📦 Size: ${data.size} bytes</div>` : ''}
         ${data.chunks ? `<div style="font-size:0.7em; color:#888;">📦 Chunks: ${data.chunks}</div>` : ''}
+        ${durationInfo}
+        ${actionButtons}
     `;
     
     messageList.insertBefore(messageEl, messageList.firstChild);
     messageCount++;
 }
 
+// Global fonksiyonlar
+window.playVoice = function(voiceId) {
+    console.log('Playing voice:', voiceId);
+    const audio = new Audio(`/api/download/${voiceId}`);
+    audio.play().catch(e => console.error('Play error:', e));
+    showNotification('Playing voice message...', 'info');
+};
+
+window.downloadVoice = function(voiceId) {
+    console.log('Downloading voice:', voiceId);
+    window.location.href = `/api/download/${voiceId}`;
+    showNotification('Download started!', 'success');
+};
+
+function updateChunkProgress(data) {
+    const chunkProgressDiv = document.getElementById('chunk-progress');
+    const chunkList = document.getElementById('chunk-list');
+    
+    if (!data.complete) {
+        chunkProgressDiv.style.display = 'block';
+        const percent = (data.received / data.total) * 100;
+        document.getElementById('chunk-progress-fill').style.width = `${percent}%`;
+        document.getElementById('chunk-progress-fill').textContent = `${Math.round(percent)}%`;
+        document.getElementById('chunk-progress-text').textContent = 
+            `Receiving from ${data.client}: Chunk ${data.seq} (${data.received}/${data.total})`;
+        
+        const emptyChunk = chunkList.querySelector('.empty-message');
+        if (emptyChunk) emptyChunk.remove();
+        
+        const chunkItem = document.createElement('div');
+        chunkItem.className = 'chunk-item';
+        chunkItem.innerHTML = `
+            <span>📦 Chunk ${data.seq}</span>
+            <span>From: ${data.client}</span>
+            <span>Progress: ${data.received}/${data.total}</span>
+        `;
+        chunkList.insertBefore(chunkItem, chunkList.firstChild);
+        
+        while (chunkList.children.length > 20) {
+            chunkList.removeChild(chunkList.lastChild);
+        }
+    } else {
+        setTimeout(() => {
+            chunkProgressDiv.style.display = 'none';
+            document.getElementById('chunk-progress-fill').style.width = '0%';
+        }, 2000);
+    }
+}
 
 function updateSendProgress(data) {
     const sendProgressDiv = document.getElementById('send-progress');
@@ -378,7 +463,6 @@ function updateMessageCount() {
 }
 
 function showNotification(message, type) {
-    // Create toast notification
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
@@ -439,6 +523,10 @@ async function loadHistory() {
         console.error('Failed to load history:', error);
     }
 }
+
+// Make functions global for onclick handlers
+window.playVoiceMessage = playVoiceMessage;
+window.downloadVoiceMessage = downloadVoiceMessage;
 
 // Add CSS animations
 const style = document.createElement('style');
