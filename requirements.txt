@@ -1,3 +1,28 @@
+# Core
+flask>=2.3.0
+flask-socketio>=5.3.0
+flask-login>=0.6.2
+python-socketio>=5.9.0
+python-engineio>=4.5.0
+
+# Database
+pymongo>=4.5.0
+bcrypt>=4.0.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Cryptography
 cryptography>=41.0.0
 kyber-py>=0.3.0
-pydivert>=2.1.0; sys_platform == 'win32'
+
+# Voice support (optional)
+sounddevice>=0.4.6
+soundfile>=0.12.1
+numpy>=1.24.0
+
+# Web Server (optional)
+eventlet>=0.33.0
+
+# Stealth mode (optional - install in development mode)
+# pip install -e .

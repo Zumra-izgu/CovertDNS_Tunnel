@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CovertDNS - Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #00ff9d;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-container {
+            background: rgba(10,14,39,0.9);
+            border-radius: 10px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(0,255,157,0.3);
+        }
+        h1 { text-align: center; margin-bottom: 30px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-size: 0.9em; }
+        input {
+            width: 100%; padding: 12px;
+            background: rgba(0,0,0,0.5); border: 1px solid rgba(0,255,157,0.3);
+            border-radius: 5px; color: #00ff9d; font-size: 14px;
+        }
+        input:focus { outline: none; border-color: #00ff9d; }
+        button {
+            width: 100%; padding: 12px;
+            background: linear-gradient(135deg, #00ff9d, #00cc7a);
+            color: #0a0e27; border: none; border-radius: 5px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,255,157,0.3); }
+        .error { color: #ff4444; text-align: center; margin-bottom: 15px; font-size: 14px; }
+        .register-link { text-align: center; margin-top: 20px; color: #888; }
+        .register-link a { color: #00ff9d; text-decoration: none; }
+        .register-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>🕵️ CovertDNS</h1>
+        <form method="POST">
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" name="username" required autofocus>
+            </div>
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <div class="register-link">
+            Don't have an account? <a href="{{ url_for('register') }}">Register</a>
+        </div>
+    </div>
+</body>
+</html>

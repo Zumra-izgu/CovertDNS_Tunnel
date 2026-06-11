@@ -2,6 +2,7 @@
 """
 CovertDNS - Quantum-Safe DNS Tunnel
 Port 53 Support - Windows/Linux/macOS
+With Stealth Mode Support
 """
 
 import socket
@@ -27,6 +28,15 @@ from shared.constants import (
     JITTER, IS_ADMIN, BYPASS_MDNS_CONFLICT, USE_RAW_SOCKET
 )
 from encryption.hybrid_crypto import HybridCrypto
+
+# Stealth module import (optional - doesn't break anything if missing)
+STEALTH_AVAILABLE = False
+StealthDNSEngine = None
+try:
+    from stealth.traffic_simulator import StealthDNSEngine
+    STEALTH_AVAILABLE = True
+except ImportError:
+    pass
 
 
 class RateLimiter:
@@ -115,6 +125,7 @@ class DNSSender:
         self.sock.settimeout(3)
         self.seq = 0
         self.rate_limiter = RateLimiter(MAX_PACKETS_PER_SECOND, BURST_SIZE)
+        self.stealth_engine = None  # Stealth engine for human-like delays
         
         if recipient_public_key_b64:
             self.public_key = base64.b64decode(recipient_public_key_b64)
@@ -124,6 +135,11 @@ class DNSSender:
         print(f"🔐 DNSSender initialized for {target_ip}:{DNS_PORT}")
         if self.public_key:
             print("🔒 Encryption enabled (Kyber-768 + AES-256-GCM)")
+    
+    def set_stealth_engine(self, engine):
+        """Set stealth engine for human-like delays"""
+        self.stealth_engine = engine
+        print("🕵️ Stealth mode enabled for sender")
     
     def build_dns_query(self, domain: str) -> bytes:
         """Build DNS query packet (RFC 1035 compliant)"""
@@ -180,9 +196,13 @@ class DNSSender:
             if not self._send_single_query(domain, i, len(chunks)):
                 return False
             
-            delay = random.uniform(MIN_DELAY_MS / 1000, MAX_DELAY_MS / 1000)
-            if JITTER:
-                delay += random.uniform(-0.03, 0.03)
+            # HUMAN-LIKE DELAY (Stealth mode if enabled, otherwise normal random)
+            if self.stealth_engine and STEALTH_AVAILABLE:
+                delay = self.stealth_engine.get_chunk_delay(i, len(chunks))
+            else:
+                delay = random.uniform(MIN_DELAY_MS / 1000, MAX_DELAY_MS / 1000)
+                if JITTER:
+                    delay += random.uniform(-0.03, 0.03)
             time.sleep(max(0.01, delay))
         
         print(f"\n✅ Message sent successfully!")
@@ -572,6 +592,13 @@ def run_sender():
     if not message:
         message = "Hello from CovertDNS on port 53!"
     
+    # Stealth mode selection
+    print("\n🕵️ Stealth Mode:")
+    print("  1 - Normal mode (simple random delays)")
+    print("  2 - Stealth mode (human-like delays + background DNS)")
+    stealth_choice = input("Choice (1/2): ").strip()
+    use_stealth = (stealth_choice == "2")
+    
     key_file = input("📁 Public key file (default public_key.b64): ").strip()
     if not key_file:
         key_file = "public_key.b64"
@@ -584,7 +611,30 @@ def run_sender():
         pub_b64 = None
     
     sender = DNSSender(target, pub_b64)
+    
+    # Initialize stealth engine if selected
+    stealth_engine = None
+    if use_stealth and STEALTH_AVAILABLE:
+        print("\n🕵️ Stealth intensity:")
+        print("  low    - Minimal background traffic")
+        print("  normal - Balanced (recommended)")
+        print("  high   - Aggressive masking")
+        print("  stealth- Maximum stealth")
+        intensity = input("Intensity [normal]: ").strip() or "normal"
+        
+        stealth_engine = StealthDNSEngine()
+        stealth_engine.start_stealth_mode(intensity)
+        sender.set_stealth_engine(stealth_engine)
+    elif use_stealth and not STEALTH_AVAILABLE:
+        print("\n⚠️ Stealth module not installed!")
+        print("   Using normal delays only")
+    
     success = sender.send_message(message)
+    
+    # Stop stealth engine if active
+    if stealth_engine:
+        stealth_engine.stop_stealth_mode()
+    
     sender.close()
     
     if success:
@@ -641,3 +691,7 @@ if __name__ == "__main__":
         print("  1. Administrator/root yetkisi gerekir")
         print("  2. Windows'ta: PowerShell'i Administrator olarak açın")
         print("  3. Linux/Mac'te: sudo kullanın")
+        print("\n🕵️ Stealth mode features (if module installed):")
+        print("  - Human-like typing/thinking/reading delays")
+        print("  - Background DNS traffic (real domains)")
+        print("  - Hour-based traffic patterns")
