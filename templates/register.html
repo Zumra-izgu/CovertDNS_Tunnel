@@ -3,11 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CovertDNS - Register</title>
+    <title>CovertDNS - Quantum-Safe DNS Tunnel Registration</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ============================================================================
+           CovertDNS Registration Page Styles
+           Theme: Cyberpunk / Terminal aesthetic with quantum accents
+           Color Palette:
+               - Primary: #00ff9d (quantum green)
+               - Background: #0a0e27 to #1a1f3a (deep space gradient)
+               - Error: #ff4444
+        ============================================================================ */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: 'Segoe UI', monospace;
+            font-family: 'Segoe UI', 'Courier New', monospace;
             background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
             color: #00ff9d;
             min-height: 100vh;
@@ -15,58 +29,209 @@
             justify-content: center;
             align-items: center;
         }
+        
+        /* ----------------------------------------------------------------------------
+           Registration Container
+        ---------------------------------------------------------------------------- */
         .register-container {
-            background: rgba(10,14,39,0.9);
+            background: rgba(10, 14, 39, 0.9);
             border-radius: 10px;
             padding: 40px;
             width: 100%;
             max-width: 400px;
-            border: 1px solid rgba(0,255,157,0.3);
+            border: 1px solid rgba(0, 255, 157, 0.3);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 30px rgba(0, 255, 157, 0.1);
+            transition: all 0.3s ease;
         }
-        h1 { text-align: center; margin-bottom: 30px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-size: 0.9em; }
+        
+        .register-container:hover {
+            border-color: rgba(0, 255, 157, 0.5);
+            box-shadow: 0 0 40px rgba(0, 255, 157, 0.15);
+        }
+        
+        /* Header */
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+            text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+            letter-spacing: 2px;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Input Fields
+        ---------------------------------------------------------------------------- */
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: #00ff9d;
+            letter-spacing: 0.5px;
+        }
+        
         input {
-            width: 100%; padding: 12px;
-            background: rgba(0,0,0,0.5); border: 1px solid rgba(0,255,157,0.3);
-            border-radius: 5px; color: #00ff9d; font-size: 14px;
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 157, 0.3);
+            border-radius: 5px;
+            color: #00ff9d;
+            font-size: 14px;
+            font-family: monospace;
+            transition: all 0.3s ease;
         }
-        input:focus { outline: none; border-color: #00ff9d; }
+        
+        input:focus {
+            outline: none;
+            border-color: #00ff9d;
+            box-shadow: 0 0 10px rgba(0, 255, 157, 0.2);
+            background: rgba(0, 0, 0, 0.7);
+        }
+        
+        input::placeholder {
+            color: rgba(0, 255, 157, 0.3);
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Register Button
+        ---------------------------------------------------------------------------- */
         button {
-            width: 100%; padding: 12px;
+            width: 100%;
+            padding: 12px;
             background: linear-gradient(135deg, #00ff9d, #00cc7a);
-            color: #0a0e27; border: none; border-radius: 5px;
-            font-size: 16px; font-weight: bold; cursor: pointer;
+            color: #0a0e27;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
             margin-top: 10px;
+            transition: all 0.3s ease;
+            font-family: inherit;
         }
-        button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,255,157,0.3); }
-        .error { color: #ff4444; text-align: center; margin-bottom: 15px; font-size: 14px; }
-        .login-link { text-align: center; margin-top: 20px; color: #888; }
-        .login-link a { color: #00ff9d; text-decoration: none; }
-        .login-link a:hover { text-decoration: underline; }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 255, 157, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Error Message
+        ---------------------------------------------------------------------------- */
+        .error {
+            color: #ff4444;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+            padding: 8px;
+            background: rgba(255, 68, 68, 0.1);
+            border-radius: 5px;
+            border-left: 3px solid #ff4444;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Login Link
+        ---------------------------------------------------------------------------- */
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #888;
+            font-size: 0.85em;
+        }
+        
+        .login-link a {
+            color: #00ff9d;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .login-link a:hover {
+            text-decoration: underline;
+            text-shadow: 0 0 5px rgba(0, 255, 157, 0.5);
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Password Strength Indicator (Optional)
+        ---------------------------------------------------------------------------- */
+        .password-hint {
+            font-size: 0.7em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Responsive Design
+        ---------------------------------------------------------------------------- */
+        @media (max-width: 480px) {
+            .register-container {
+                margin: 20px;
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            input, button {
+                padding: 10px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="register-container">
         <h1>🕵️ CovertDNS</h1>
+        
+        <!-- Registration Form -->
         <form method="POST">
+            <!-- Display error message if registration validation fails -->
             {% if error %}
             <div class="error">{{ error }}</div>
             {% endif %}
+            
+            <!-- Username Field -->
             <div class="input-group">
                 <label>Username</label>
-                <input type="text" name="username" required autofocus>
+                <input type="text" 
+                       name="username" 
+                       placeholder="Choose a username" 
+                       required 
+                       autofocus>
             </div>
+            
+            <!-- Password Field -->
             <div class="input-group">
                 <label>Password</label>
-                <input type="password" name="password" required>
+                <input type="password" 
+                       name="password" 
+                       placeholder="Create a strong password" 
+                       required>
+                <div class="password-hint">Minimum 4 characters recommended</div>
             </div>
+            
+            <!-- Confirm Password Field -->
             <div class="input-group">
                 <label>Confirm Password</label>
-                <input type="password" name="confirm_password" required>
+                <input type="password" 
+                       name="confirm_password" 
+                       placeholder="Confirm your password" 
+                       required>
             </div>
+            
+            <!-- Submit Button -->
             <button type="submit">Register</button>
         </form>
+        
+        <!-- Login Link for Existing Users -->
         <div class="login-link">
             Already have an account? <a href="{{ url_for('login') }}">Login</a>
         </div>

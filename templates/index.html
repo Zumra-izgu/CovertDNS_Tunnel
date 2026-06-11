@@ -3,137 +3,518 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CovertDNS - Dashboard</title>
+    <title>CovertDNS - Quantum-Safe DNS Tunnel Dashboard</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ============================================================================
+           CovertDNS Dashboard Styles
+           Theme: Cyberpunk / Terminal aesthetic with quantum accents
+           Color Palette:
+               - Primary: #00ff9d (quantum green)
+               - Background: #0a0e27 to #1a1f3a (deep space gradient)
+               - Error: #ff4444
+               - Warning: #ffaa00
+               - Info: #00aacc
+        ============================================================================ */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: 'Segoe UI', monospace;
+            font-family: 'Segoe UI', 'Courier New', monospace;
             background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
             color: #00ff9d;
             min-height: 100vh;
             padding: 20px;
         }
-        .container { max-width: 900px; margin: 0 auto; }
-        .header { 
-            text-align: center; 
-            margin-bottom: 30px; 
-            padding: 20px; 
-            background: rgba(0,255,157,0.1); 
-            border-radius: 10px; 
-            position: relative; 
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
         }
-        .logout-btn { 
-            position: absolute; 
-            top: 20px; 
-            right: 20px; 
-            background: rgba(255,68,68,0.2); 
-            color: #ff4444; 
-            padding: 8px 16px; 
-            border-radius: 5px; 
-            text-decoration: none; 
+        
+        /* ----------------------------------------------------------------------------
+           Header Styles
+        ---------------------------------------------------------------------------- */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 255, 157, 0.1);
+            border-radius: 10px;
+            position: relative;
+            border: 1px solid rgba(0, 255, 157, 0.3);
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+        }
+        
+        .subtitle {
+            color: #888;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        
+        /* Logout Button */
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            padding: 8px 16px;
+            border-radius: 5px;
+            text-decoration: none;
             font-size: 14px;
             transition: 0.3s;
             cursor: pointer;
-            border: 1px solid rgba(255,68,68,0.3);
+            border: 1px solid rgba(255, 68, 68, 0.3);
         }
-        .logout-btn:hover { 
-            background: rgba(255,68,68,0.4);
+        
+        .logout-btn:hover {
+            background: rgba(255, 68, 68, 0.4);
             border-color: #ff4444;
         }
-        .card { background: rgba(10,14,39,0.9); border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(0,255,157,0.2); overflow: hidden; }
-        .card-header { padding: 15px 20px; background: rgba(0,255,157,0.05); border-bottom: 1px solid rgba(0,255,157,0.2); }
-        .card-header h2 { font-size: 1.1em; }
-        .card-body { padding: 20px; }
-        .step-card { position: relative; }
+        
+        /* ----------------------------------------------------------------------------
+           Card Styles
+        ---------------------------------------------------------------------------- */
+        .card {
+            background: rgba(10, 14, 39, 0.9);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0, 255, 157, 0.2);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            border-color: rgba(0, 255, 157, 0.5);
+            box-shadow: 0 0 20px rgba(0, 255, 157, 0.1);
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+            background: rgba(0, 255, 157, 0.05);
+            border-bottom: 1px solid rgba(0, 255, 157, 0.2);
+        }
+        
+        .card-header h2 {
+            font-size: 1.1em;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        /* Step Card with Number Badge */
+        .step-card {
+            position: relative;
+            overflow: visible;
+        }
+        
         .step-number {
-            position: absolute; top: -15px; left: 20px;
-            width: 35px; height: 35px;
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            width: 35px;
+            height: 35px;
             background: linear-gradient(135deg, #00ff9d, #00cc7a);
-            color: #0a0e27; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 18px;
-            box-shadow: 0 0 15px rgba(0,255,157,0.5);
+            color: #0a0e27;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(0, 255, 157, 0.5);
         }
+        
+        /* ----------------------------------------------------------------------------
+           Button Styles
+        ---------------------------------------------------------------------------- */
         .btn {
-            padding: 10px 20px; border: none; border-radius: 5px;
-            cursor: pointer; font-family: inherit; font-size: 14px;
-            transition: 0.3s; margin: 5px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            transition: 0.3s;
+            margin: 5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
-        .btn-primary { background: linear-gradient(135deg, #00ff9d, #00cc7a); color: #0a0e27; font-weight: bold; }
-        .btn-secondary { background: rgba(0,255,157,0.2); color: #00ff9d; border: 1px solid #00ff9d; }
-        .btn-primary:hover, .btn-secondary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,255,157,0.3); }
-        .input-group { margin-bottom: 15px; }
-        .input-group label { display: block; margin-bottom: 5px; font-size: 0.85em; }
-        .input-group input, .input-group textarea {
-            width: 100%; padding: 10px;
-            background: rgba(0,0,0,0.5); border: 1px solid rgba(0,255,157,0.3);
-            border-radius: 5px; color: #00ff9d; font-family: monospace; font-size: 14px;
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #00ff9d, #00cc7a);
+            color: #0a0e27;
+            font-weight: bold;
         }
-        textarea { resize: vertical; }
-        .radio-group { display: flex; gap: 20px; margin: 15px 0; flex-wrap: wrap; }
-        .key-display { margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 5px; }
-        .key-item { margin-bottom: 10px; }
-        .key-item label { font-size: 0.75em; color: #888; }
-        .key-value { font-family: monospace; font-size: 0.65em; word-break: break-all; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 3px; color: #aaa; max-height: 80px; overflow-y: auto; }
-        .progress-bar { background: rgba(0,0,0,0.5); border-radius: 10px; overflow: hidden; margin: 10px 0; }
-        .progress-fill { background: linear-gradient(90deg, #00ff9d, #00cc7a); width: 0%; height: 25px; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: #0a0e27; font-weight: bold; font-size: 12px; }
-        .message-list { max-height: 300px; overflow-y: auto; }
-        .message-item { padding: 8px; margin-bottom: 8px; background: rgba(0,0,0,0.3); border-left: 3px solid #00ff9d; border-radius: 5px; }
-        .message-header { display: flex; gap: 10px; margin-bottom: 5px; font-size: 0.7em; color: #888; flex-wrap: wrap; }
-        .message-content { font-family: monospace; word-break: break-word; font-size: 0.8em; }
-        .footer { text-align: center; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 10px; font-size: 0.8em; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
-        .stealth-options { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-        .stealth-card { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; transition: 0.3s; border: 2px solid transparent; flex: 1; min-width: 80px; }
-        .stealth-card.active { border-color: #00ff9d; background: rgba(0,255,157,0.1); }
-        .stealth-icon { font-size: 24px; }
-        .stealth-title { font-size: 12px; }
-        .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; z-index: 1000; animation: slideIn 0.3s; font-size: 14px; }
-        .toast-success { background: #00cc88; color: white; }
-        .toast-error { background: #ff4444; color: white; }
-        .toast-info { background: #00aacc; color: white; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+        
+        .btn-secondary {
+            background: rgba(0, 255, 157, 0.2);
+            color: #00ff9d;
+            border: 1px solid #00ff9d;
+        }
+        
+        .btn-primary:hover, .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 255, 157, 0.3);
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Input Styles
+        ---------------------------------------------------------------------------- */
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+            color: #00ff9d;
+        }
+        
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 157, 0.3);
+            border-radius: 5px;
+            color: #00ff9d;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .input-group input:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #00ff9d;
+        }
+        
+        textarea {
+            resize: vertical;
+        }
+        
+        /* Radio Button Group */
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Key Display Panel
+        ---------------------------------------------------------------------------- */
+        .key-display {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+        }
+        
+        .key-item {
+            margin-bottom: 10px;
+        }
+        
+        .key-item label {
+            font-size: 0.75em;
+            color: #888;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .key-value {
+            font-family: monospace;
+            font-size: 0.65em;
+            word-break: break-all;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px;
+            border-radius: 3px;
+            color: #aaa;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Progress Bar
+        ---------------------------------------------------------------------------- */
+        .progress-bar {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #00ff9d, #00cc7a);
+            width: 0%;
+            height: 25px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0a0e27;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Message List
+        ---------------------------------------------------------------------------- */
+        .message-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .message-item {
+            padding: 8px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid #00ff9d;
+            border-radius: 5px;
+        }
+        
+        .message-header {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 5px;
+            font-size: 0.7em;
+            color: #888;
+            flex-wrap: wrap;
+        }
+        
+        .message-content {
+            font-family: monospace;
+            word-break: break-word;
+            font-size: 0.8em;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Footer
+        ---------------------------------------------------------------------------- */
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            font-size: 0.8em;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Stealth Mode Cards
+        ---------------------------------------------------------------------------- */
+        .stealth-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        
+        .stealth-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            border: 2px solid transparent;
+            flex: 1;
+            min-width: 80px;
+        }
+        
+        .stealth-card.active {
+            border-color: #00ff9d;
+            background: rgba(0, 255, 157, 0.1);
+        }
+        
+        .stealth-card:hover {
+            transform: translateY(-2px);
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        .stealth-icon {
+            font-size: 24px;
+        }
+        
+        .stealth-title {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Toast Notifications
+        ---------------------------------------------------------------------------- */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            font-size: 14px;
+            font-family: monospace;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .toast-success {
+            background: #00cc88;
+            color: white;
+        }
+        
+        .toast-error {
+            background: #ff4444;
+            color: white;
+        }
+        
+        .toast-info {
+            background: #00aacc;
+            color: white;
+        }
+        
+        .toast-warning {
+            background: #ffaa00;
+            color: #0a0e27;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Empty State
+        ---------------------------------------------------------------------------- */
+        .empty-message {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Animations
+        ---------------------------------------------------------------------------- */
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        /* ----------------------------------------------------------------------------
+           Responsive Design
+        ---------------------------------------------------------------------------- */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .stealth-options {
+                flex-direction: column;
+            }
+            
+            .stealth-card {
+                min-width: auto;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header Section -->
         <div class="header">
             <h1>🕵️ CovertDNS</h1>
+            <p class="subtitle">Quantum-Safe DNS Tunnel | Kyber-768 + AES-256-GCM</p>
             <p class="subtitle">Welcome, <span id="username-display">User</span>!</p>
             <button class="logout-btn" id="logout-btn">🚪 Logout</button>
         </div>
 
-        <!-- Step 1: Keys -->
+        <!-- Step 1: Key Management -->
         <div class="card step-card">
             <div class="step-number">1</div>
-            <div class="card-header"><h2>🔑 Your Keys</h2></div>
+            <div class="card-header">
+                <h2>🔑 Key Management</h2>
+            </div>
             <div class="card-body">
                 <button class="btn btn-primary" id="genkeys-btn">✨ Generate New Keys</button>
                 <button class="btn btn-secondary" id="loadkeys-btn">📂 Load My Keys</button>
                 <div class="key-display">
                     <div class="key-item">
-                        <label>📤 YOUR PUBLIC KEY:</label>
+                        <label>📤 YOUR PUBLIC KEY (Share with senders):</label>
                         <div class="key-value" id="public-key-display">-</div>
                     </div>
                     <div class="key-item">
-                        <label>📥 YOUR PRIVATE KEY (for receiver terminal):</label>
+                        <label>📥 YOUR PRIVATE KEY (Keep secret - for receiver terminal):</label>
                         <div class="key-value" id="private-key-display">-</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Step 2: Stealth Mode -->
+        <!-- Step 2: Stealth Mode Configuration -->
         <div class="card step-card">
             <div class="step-number">2</div>
-            <div class="card-header"><h2>🕵️ Stealth Mode</h2></div>
+            <div class="card-header">
+                <h2>🕵️ Stealth Mode Configuration</h2>
+            </div>
             <div class="card-body">
                 <div class="stealth-options" id="stealth-options">
-                    <div class="stealth-card" data-stealth="off"><div class="stealth-icon">🔓</div><div class="stealth-title">Normal</div></div>
-                    <div class="stealth-card" data-stealth="low"><div class="stealth-icon">🕵️</div><div class="stealth-title">Low</div></div>
-                    <div class="stealth-card active" data-stealth="normal"><div class="stealth-icon">🕵️‍♂️</div><div class="stealth-title">Normal</div></div>
-                    <div class="stealth-card" data-stealth="high"><div class="stealth-icon">👻</div><div class="stealth-title">High</div></div>
+                    <div class="stealth-card" data-stealth="off">
+                        <div class="stealth-icon">🔓</div>
+                        <div class="stealth-title">Normal Mode</div>
+                    </div>
+                    <div class="stealth-card" data-stealth="low">
+                        <div class="stealth-icon">🕵️</div>
+                        <div class="stealth-title">Low Stealth</div>
+                    </div>
+                    <div class="stealth-card active" data-stealth="normal">
+                        <div class="stealth-icon">🕵️‍♂️</div>
+                        <div class="stealth-title">Normal Stealth</div>
+                    </div>
+                    <div class="stealth-card" data-stealth="high">
+                        <div class="stealth-icon">👻</div>
+                        <div class="stealth-title">High Stealth</div>
+                    </div>
+                </div>
+                <div style="font-size: 11px; color: #888; margin-top: 10px;">
+                    🕵️ Stealth mode simulates real DNS traffic (google.com, wechat.com, etc.) to hide your tunnel.
                 </div>
             </div>
         </div>
@@ -141,73 +522,111 @@
         <!-- Step 3: Send Message -->
         <div class="card step-card">
             <div class="step-number">3</div>
-            <div class="card-header"><h2>📤 Send Message</h2></div>
+            <div class="card-header">
+                <h2>📤 Send Message</h2>
+            </div>
             <div class="card-body">
                 <div class="input-group">
-                    <label>🎯 Target IP:</label>
+                    <label>🎯 Target IP Address:</label>
                     <input type="text" id="target-ip" value="127.0.0.1">
                 </div>
                 <div class="input-group">
-                    <label>📤 Receiver's Public Key:</label>
-                    <textarea id="public-key-input" rows="2" placeholder="Paste receiver's public key..."></textarea>
+                    <label>📤 Receiver's Public Key (Base64):</label>
+                    <textarea id="public-key-input" rows="2" placeholder="Paste receiver's public key here..."></textarea>
                 </div>
                 <div class="radio-group">
-                    <label><input type="radio" name="encrypt" value="encrypted" checked> 🔒 Encrypted</label>
-                    <label><input type="radio" name="encrypt" value="plain"> 🔓 Plain</label>
+                    <label>
+                        <input type="radio" name="encrypt" value="encrypted" checked> 
+                        🔒 Encrypted (Kyber-768 + AES-256)
+                    </label>
+                    <label>
+                        <input type="radio" name="encrypt" value="plain"> 
+                        🔓 Plain Text (Base64 only - Faster)
+                    </label>
                 </div>
                 <div class="input-group">
                     <label>💬 Message:</label>
-                    <textarea id="text-message" rows="3" placeholder="Type your message..."></textarea>
+                    <textarea id="text-message" rows="3" placeholder="Type your secret message here..."></textarea>
                 </div>
-                <button class="btn btn-primary" id="send-btn">📨 Send</button>
+                <button class="btn btn-primary" id="send-btn">📨 Send Message</button>
                 <div id="send-progress" style="display:none; margin-top:10px;">
-                    <div class="progress-bar"><div class="progress-fill" id="send-progress-fill"></div></div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="send-progress-fill"></div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Step 4: Sent Messages -->
+        <!-- Step 4: Message History -->
         <div class="card step-card">
             <div class="step-number">4</div>
-            <div class="card-header"><h2>📋 Sent Messages</h2></div>
+            <div class="card-header">
+                <h2>📋 Sent Messages</h2>
+            </div>
             <div class="card-body">
-                <div class="message-list" id="sent-list"><div class="empty-message">No messages sent yet.</div></div>
+                <div class="message-list" id="sent-list">
+                    <div class="empty-message">No messages sent yet.</div>
+                </div>
             </div>
         </div>
 
+        <!-- Footer Status Bar -->
         <div class="footer">
-            <span>🔐 Port: <strong id="port-status">53</strong></span>
-            <span>🌐 Domain: <strong id="domain-status">covert.local</strong></span>
-            <span>📦 Chunk: <strong id="chunk-status">45</strong></span>
+            <span>🔐 DNS Port: <strong id="port-status">53</strong></span>
+            <span>🌐 Base Domain: <strong id="domain-status">covert.local</strong></span>
+            <span>📦 Max Chunk Size: <strong id="chunk-status">45</strong> bytes</span>
         </div>
     </div>
 
     <script>
+        /**
+         * CovertDNS Dashboard Client-Side Application
+         * 
+         * This script handles:
+         *     - WebSocket communication with the Flask-SocketIO backend
+         *     - Key generation and loading
+         *     - Stealth mode selection
+         *     - Message sending with progress tracking
+         *     - Message history display
+         *     - Real-time notifications
+         */
+        
+        // Initialize Socket.IO connection
         const socket = io();
+        
+        // Application state
         let currentStealthMode = 'normal';
         
+        // ============================================================================
+        // Socket.IO Event Handlers
+        // ============================================================================
+        
         socket.on('connect', () => {
-            console.log('Connected to server');
+            console.log('[WebSocket] Connected to CovertDNS server');
         });
         
         socket.on('keys_updated', (data) => {
+            // Update the displayed keys in the UI
             document.getElementById('public-key-display').textContent = data.public || '-';
             document.getElementById('private-key-display').textContent = data.private || '-';
-            showToast('Keys updated!', 'success');
+            showToast('Keys updated successfully!', 'success');
         });
         
         socket.on('stealth_status', (data) => {
-            console.log('Stealth status:', data);
+            console.log('[Stealth] Status updated:', data);
         });
         
         socket.on('send_progress', (data) => {
+            // Update the progress bar during message transmission
             const div = document.getElementById('send-progress');
             div.style.display = 'block';
-            document.getElementById('send-progress-fill').style.width = `${data.percent}%`;
-            document.getElementById('send-progress-fill').textContent = `${Math.round(data.percent)}%`;
+            const percent = data.percent || 0;
+            document.getElementById('send-progress-fill').style.width = `${percent}%`;
+            document.getElementById('send-progress-fill').textContent = `${Math.round(percent)}%`;
         });
         
         socket.on('send_complete', () => {
+            // Hide progress bar after transmission completes
             setTimeout(() => {
                 document.getElementById('send-progress').style.display = 'none';
                 document.getElementById('send-progress-fill').style.width = '0%';
@@ -215,8 +634,8 @@
         });
         
         socket.on('message_sent', (data) => {
-            showToast('Message sent!', 'success');
-            loadHistory();
+            showToast(`Message sent to ${data.target}!`, 'success');
+            loadHistory();  // Refresh the message history
         });
         
         socket.on('history_data', (data) => {
@@ -231,139 +650,232 @@
             showToast(`Error: ${data.message}`, 'error');
         });
         
-        // Logout button
+        // ============================================================================
+        // Event Listeners
+        // ============================================================================
+        
+        // Logout button handler
         document.getElementById('logout-btn').addEventListener('click', async () => {
-            const res = await fetch('/logout');
-            if (res.redirected) {
+            const response = await fetch('/logout');
+            if (response.redirected) {
                 window.location.href = '/login';
             }
         });
         
-        // Stealth mode selection
+        // Stealth mode selection handler
         document.querySelectorAll('.stealth-card').forEach(card => {
             card.addEventListener('click', () => {
+                // Remove active class from all cards
                 document.querySelectorAll('.stealth-card').forEach(c => c.classList.remove('active'));
+                // Add active class to selected card
                 card.classList.add('active');
+                // Update application state
                 currentStealthMode = card.getAttribute('data-stealth');
+                // Notify the server
                 socket.emit('set_stealth_mode', { mode: currentStealthMode });
-                showToast(`Stealth mode: ${card.querySelector('.stealth-title').textContent}`, 'info');
+                // Show confirmation notification
+                const modeName = card.querySelector('.stealth-title').textContent;
+                showToast(`Stealth mode changed to: ${modeName}`, 'info');
             });
         });
         
-        // Key buttons
+        // Generate new keys handler
         document.getElementById('genkeys-btn').onclick = async () => {
             const btn = document.getElementById('genkeys-btn');
             btn.disabled = true;
             btn.innerHTML = '⏳ Generating...';
-            const res = await fetch('/api/keys/generate', { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                document.getElementById('public-key-input').value = data.public;
-                showToast('Keys generated!', 'success');
-            } else {
-                showToast(`Error: ${data.error}`, 'error');
+            
+            try {
+                const response = await fetch('/api/keys/generate', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Auto-fill the public key input field
+                    document.getElementById('public-key-input').value = data.public;
+                    showToast('New Kyber-768 keypair generated!', 'success');
+                } else {
+                    showToast(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '✨ Generate New Keys';
             }
-            btn.disabled = false;
-            btn.innerHTML = '✨ Generate New Keys';
         };
         
+        // Load existing keys handler
         document.getElementById('loadkeys-btn').onclick = async () => {
-            const res = await fetch('/api/keys/load', { method: 'POST' });
-            const data = await res.json();
-            if (data.success) showToast('Keys loaded!', 'success');
-            else showToast('No key files found', 'warning');
+            try {
+                const response = await fetch('/api/keys/load', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Keys loaded from database!', 'success');
+                } else {
+                    showToast('No key files found. Generate new keys first.', 'warning');
+                }
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            }
         };
         
-        // Send message
+        // Send message handler
         document.getElementById('send-btn').onclick = async () => {
             const target = document.getElementById('target-ip').value;
-            const pubkey = document.getElementById('public-key-input').value;
-            const msg = document.getElementById('text-message').value;
+            const publicKey = document.getElementById('public-key-input').value;
+            const message = document.getElementById('text-message').value;
             const encryptRadio = document.querySelector('input[name="encrypt"]:checked');
             const encrypt = encryptRadio ? encryptRadio.value === 'encrypted' : true;
             
-            if (!msg) { showToast('Enter a message', 'warning'); return; }
-            if (encrypt && !pubkey) { showToast('Paste public key for encrypted message', 'warning'); return; }
+            // Input validation
+            if (!message) {
+                showToast('Please enter a message', 'warning');
+                return;
+            }
+            
+            if (encrypt && !publicKey) {
+                showToast('Please paste the receiver\'s public key for encrypted messaging', 'warning');
+                return;
+            }
             
             const btn = document.getElementById('send-btn');
             btn.disabled = true;
             btn.innerHTML = '⏳ Sending...';
             
-            const res = await fetch('/api/sender/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    target_ip: target,
-                    message: msg,
-                    encrypt: encrypt,
-                    public_key: pubkey || null,
-                    stealth_mode: currentStealthMode
-                })
-            });
-            const data = await res.json();
-            if (!data.success) showToast(`Error: ${data.error}`, 'error');
-            else {
-                document.getElementById('text-message').value = '';
+            try {
+                const response = await fetch('/api/sender/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target_ip: target,
+                        message: message,
+                        encrypt: encrypt,
+                        public_key: publicKey || null,
+                        stealth_mode: currentStealthMode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showToast(`Error: ${data.error}`, 'error');
+                } else {
+                    // Clear the message input on success
+                    document.getElementById('text-message').value = '';
+                }
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '📨 Send Message';
             }
-            btn.disabled = false;
-            btn.innerHTML = '📨 Send';
         };
         
+        // ============================================================================
+        // Helper Functions
+        // ============================================================================
+        
+        /**
+         * Load message history from the server
+         */
         async function loadHistory() {
-            const res = await fetch('/api/history');
-            const data = await res.json();
-            updateSentList(data.sent);
+            try {
+                const response = await fetch('/api/history');
+                const data = await response.json();
+                updateSentList(data.sent);
+            } catch (error) {
+                console.error('[History] Failed to load:', error);
+            }
         }
         
+        /**
+         * Update the sent messages list in the UI
+         * 
+         * @param {Array} messages - Array of message objects
+         */
         function updateSentList(messages) {
             const container = document.getElementById('sent-list');
+            
             if (!messages || messages.length === 0) {
                 container.innerHTML = '<div class="empty-message">No messages sent yet.</div>';
                 return;
             }
             
-            container.innerHTML = messages.map(m => `
+            container.innerHTML = messages.map(message => `
                 <div class="message-item">
                     <div class="message-header">
-                        📤 To: ${escapeHtml(m.to)} 
-                        <span>${m.time}</span>
+                        📤 To: ${escapeHtml(message.to)} 
+                        <span>${message.time || new Date().toLocaleString()}</span>
                     </div>
-                    <div class="message-content">${escapeHtml(m.message)}</div>
-                    ${m.encrypted ? '<div style="font-size:0.7em;color:#888;">🔐 Encrypted</div>' : ''}
-                    ${m.stealth && m.stealth !== 'off' ? `<div style="font-size:0.7em;color:#888;">🕵️ Stealth: ${m.stealth}</div>` : ''}
+                    <div class="message-content">${escapeHtml(message.message)}</div>
+                    ${message.encrypted ? '<div style="font-size:0.7em; color:#888;">🔐 Encrypted (Kyber-768 + AES-256)</div>' : ''}
+                    ${message.stealth && message.stealth !== 'off' ? `<div style="font-size:0.7em; color:#888;">🕵️ Stealth Mode: ${message.stealth}</div>` : ''}
                 </div>
             `).join('');
         }
         
+        /**
+         * Load system status from the server
+         */
         async function loadStatus() {
-            const res = await fetch('/api/status');
-            const status = await res.json();
-            document.getElementById('port-status').textContent = status.port;
-            document.getElementById('domain-status').textContent = status.domain;
-            document.getElementById('chunk-status').textContent = status.chunk_size;
-            document.getElementById('username-display').textContent = status.username;
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                
+                document.getElementById('port-status').textContent = status.port;
+                document.getElementById('domain-status').textContent = status.domain;
+                document.getElementById('chunk-status').textContent = status.chunk_size;
+                document.getElementById('username-display').textContent = status.username;
+            } catch (error) {
+                console.error('[Status] Failed to load:', error);
+            }
         }
         
+        /**
+         * Escape HTML special characters to prevent XSS attacks
+         * 
+         * @param {string} text - Raw text to escape
+         * @returns {string} HTML-escaped text
+         */
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
         
-        function showToast(msg, type) {
+        /**
+         * Display a temporary toast notification
+         * 
+         * @param {string} message - Message to display
+         * @param {string} type - Notification type (success, error, info, warning)
+         */
+        function showToast(message, type) {
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
-            toast.textContent = msg;
+            toast.textContent = message;
             document.body.appendChild(toast);
+            
+            // Auto-remove after 3 seconds
             setTimeout(() => {
                 toast.style.animation = 'slideOut 0.3s ease';
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
         
+        // ============================================================================
+        // Initialization
+        // ============================================================================
+        
+        // Load initial data
         loadStatus();
         loadHistory();
-        setInterval(() => { loadStatus(); loadHistory(); }, 5000);
+        
+        // Refresh data every 5 seconds to keep the UI up-to-date
+        setInterval(() => {
+            loadStatus();
+            loadHistory();
+        }, 5000);
     </script>
 </body>
 </html>

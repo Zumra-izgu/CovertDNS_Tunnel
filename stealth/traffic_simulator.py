@@ -1,6 +1,20 @@
 """
-DNS Traffic Simulator - Human-like behaviors
-Makes DNS tunnel traffic appear as normal user activity
+DNS Traffic Simulator - Human-Like Behaviors
+
+This module implements anti-detection features that make DNS tunnel traffic
+appear indistinguishable from normal user activity. It simulates realistic
+DNS query patterns, human typing/thinking/reading delays, and background
+traffic to legitimate domains.
+
+The simulator works by:
+    1. Generating background DNS queries to popular domains (Google, YouTube, etc.)
+    2. Varying traffic intensity based on time of day
+    3. Adding human-like delays between queries (typing, thinking, reading)
+    4. Introducing random distractions (user looking away, etc.)
+    5. Randomizing DNS record types and chunk sizes
+
+These techniques collectively make the covert channel resistant to
+behavioral analysis and traffic pattern detection.
 """
 
 import random
@@ -12,7 +26,11 @@ from datetime import datetime
 import os
 import json
 
-# Realistic domain list (from Alexa Top domains)
+# ============================================================================
+# Realistic Domain List
+# ============================================================================
+
+# Popular domains from Alexa Top 1000 (realistic user traffic)
 REAL_DOMAINS = [
     "google.com", "youtube.com", "facebook.com", "baidu.com", "wikipedia.org",
     "amazon.com", "yahoo.com", "twitter.com", "instagram.com", "linkedin.com",
@@ -22,10 +40,16 @@ REAL_DOMAINS = [
     "cloudflare.com", "adobe.com", "dropbox.com", "salesforce.com", "craigslist.org"
 ]
 
-# DNS query types
+# DNS query types (A, AAAA, MX, TXT, NS, CNAME)
+# Randomizing query types makes traffic appear more legitimate
 RECORD_TYPES = [1, 28, 15, 16, 2, 5]  # A, AAAA, MX, TXT, NS, CNAME
 
-# Hourly traffic intensity (0-23 hours, 0-10 intensity)
+# ============================================================================
+# Hourly Traffic Intensity
+# ============================================================================
+
+# Traffic intensity varies by hour of day (0-23 hours, 0-10 intensity)
+# This mimics real user behavior: low traffic at night, high during the day
 HOUR_TRAFFIC = {
     0: 1, 1: 1, 2: 1, 3: 1, 4: 2, 5: 3, 6: 5, 7: 7,
     8: 9, 9: 10, 10: 10, 11: 9, 12: 8, 13: 9, 14: 10, 15: 9,
@@ -33,10 +57,34 @@ HOUR_TRAFFIC = {
 }
 
 
+# ============================================================================
+# Traffic Simulator
+# ============================================================================
+
 class TrafficSimulator:
-    """Realistic DNS traffic simulator with background queries"""
+    """
+    Realistic DNS traffic simulator that generates background queries.
+    
+    This class runs a background thread that periodically sends DNS queries
+    to legitimate domains (e.g., google.com, youtube.com). The frequency of
+    these queries varies based on the time of day, making the overall traffic
+    pattern appear human-like rather than machine-generated.
+    
+    Attributes:
+        dns_server (str): Target DNS server (default: 8.8.8.8 - Google DNS)
+        running (bool): Flag indicating whether background traffic is active
+        sock (socket.socket): UDP socket for sending DNS queries
+        stats (dict): Statistics tracking number of fake queries sent
+    """
     
     def __init__(self, dns_server: str = "8.8.8.8"):
+        """
+        Initialize the traffic simulator.
+        
+        Args:
+            dns_server: DNS server to send background queries to.
+                       Default: 8.8.8.8 (Google Public DNS)
+        """
         self.dns_server = dns_server
         self.running = False
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -48,14 +96,29 @@ class TrafficSimulator:
         print(f"   Fake domains: {len(REAL_DOMAINS)}")
     
     def get_traffic_intensity(self) -> float:
-        """Get current traffic intensity based on hour"""
+        """
+        Get current traffic intensity based on the hour of day.
+        
+        Returns:
+            float: Interval in seconds between background queries.
+                  Higher intensity (daytime) = lower interval.
+        """
         hour = datetime.now().hour
         intensity = HOUR_TRAFFIC.get(hour, 5)
         # Convert to interval in seconds (higher intensity = lower interval)
         return max(2.0, 15.0 / max(1, intensity))
     
     def build_dns_query(self, domain: str, query_type: int = 1) -> bytes:
-        """Build a DNS query packet"""
+        """
+        Build a DNS query packet for a given domain.
+        
+        Args:
+            domain: Domain name to query.
+            query_type: DNS record type (1 = A record).
+        
+        Returns:
+            bytes: Complete DNS query packet.
+        """
         transaction_id = random.randint(0, 65535).to_bytes(2, 'big')
         flags = (0x0100).to_bytes(2, 'big')
         qdcount = (0x0001).to_bytes(2, 'big')
@@ -71,6 +134,15 @@ class TrafficSimulator:
         return header + question + qtype + qclass
     
     def _encode_domain_name(self, domain: str) -> bytes:
+        """
+        Encode a domain name in DNS wire format.
+        
+        Args:
+            domain: Domain name string.
+        
+        Returns:
+            bytes: Domain name in DNS wire format.
+        """
         parts = domain.split('.')
         result = b''
         for part in parts:
@@ -82,7 +154,15 @@ class TrafficSimulator:
         return result
     
     def send_realistic_query(self) -> bool:
-        """Send a realistic DNS query to real DNS server"""
+        """
+        Send a realistic DNS query to the configured DNS server.
+        
+        Selects a random domain from REAL_DOMAINS and a random record type
+        to make the query appear legitimate.
+        
+        Returns:
+            bool: True if the query was sent successfully, False otherwise.
+        """
         domain = random.choice(REAL_DOMAINS)
         qtype = random.choice(RECORD_TYPES)
         
@@ -96,12 +176,16 @@ class TrafficSimulator:
             return False
     
     def start_background_traffic(self):
-        """Start background DNS traffic in separate thread"""
+        """
+        Start background DNS traffic in a separate daemon thread.
+        
+        The background traffic continues until stop_background_traffic() is called.
+        """
         def _background_worker():
             while self.running:
                 try:
                     interval = self.get_traffic_intensity()
-                    # Add random jitter
+                    # Add random jitter to avoid periodic patterns
                     interval *= random.uniform(0.5, 1.5)
                     
                     time.sleep(interval)
@@ -116,43 +200,71 @@ class TrafficSimulator:
         return thread
     
     def stop_background_traffic(self):
-        """Stop background traffic"""
+        """Stop background DNS traffic and close the socket."""
         self.running = False
         if self.sock:
             self.sock.close()
     
     def get_stats(self) -> dict:
-        """Get simulation statistics"""
+        """Get simulation statistics."""
         return self.stats
 
 
+# ============================================================================
+# Human Behavior Simulator
+# ============================================================================
+
 class HumanBehaviorSimulator:
-    """Simulate human typing, thinking, and reading patterns"""
+    """
+    Simulate human typing, thinking, and reading patterns.
+    
+    This class models the natural delays that occur when a human user is
+    interacting with a messaging application. It includes:
+        - Typing delays (fast, normal, slow typers)
+        - Thinking delays before responding
+        - Reading delays for incoming messages
+        - Random distractions (user looks away, gets interrupted)
+    
+    The delays are probabilistically distributed to mimic real human behavior
+    rather than machine-precise timing.
+    """
     
     def __init__(self):
+        # Typing speed profiles (words per minute and corresponding delays)
         self.typing_speeds = {
             "fast": {"wpm": 80, "min_delay": 0.03, "max_delay": 0.08, "prob": 0.2},
             "normal": {"wpm": 50, "min_delay": 0.08, "max_delay": 0.15, "prob": 0.6},
             "slow": {"wpm": 30, "min_delay": 0.15, "max_delay": 0.35, "prob": 0.2}
         }
         
+        # Thinking time before responding to a message
         self.thinking_times = {
             "quick": {"min": 0.1, "max": 0.4, "prob": 0.3},
             "normal": {"min": 0.4, "max": 1.0, "prob": 0.5},
             "careful": {"min": 1.0, "max": 2.5, "prob": 0.2}
         }
         
+        # Reading speed (characters per second)
         self.reading_speeds = {
             "fast": {"chars_per_sec": 500, "prob": 0.2},
             "normal": {"chars_per_sec": 300, "prob": 0.6},
             "slow": {"chars_per_sec": 150, "prob": 0.2}
         }
         
+        # Random distraction simulation
         self.distraction_probability = 0.1  # 10% chance of distraction
         self.distraction_duration = {"min": 2.0, "max": 8.0}
     
     def _select_pattern(self, patterns: dict) -> dict:
-        """Select a pattern based on probability"""
+        """
+        Select a pattern based on probability distribution.
+        
+        Args:
+            patterns: Dictionary of patterns with 'prob' keys.
+        
+        Returns:
+            dict: Selected pattern.
+        """
         r = random.random()
         cumulative = 0
         for name, pattern in patterns.items():
@@ -162,7 +274,15 @@ class HumanBehaviorSimulator:
         return patterns["normal"]
     
     def get_typing_delay(self, text_length: int = None) -> float:
-        """Get human-like typing delay"""
+        """
+        Get a human-like typing delay for a message.
+        
+        Args:
+            text_length: Length of the message in characters (optional).
+        
+        Returns:
+            float: Delay in seconds.
+        """
         pattern = self._select_pattern(self.typing_speeds)
         
         if text_length:
@@ -174,12 +294,25 @@ class HumanBehaviorSimulator:
             return random.uniform(pattern["min_delay"], pattern["max_delay"])
     
     def get_thinking_delay(self) -> float:
-        """Get human-like thinking delay before responding"""
+        """
+        Get a human-like thinking delay before responding.
+        
+        Returns:
+            float: Delay in seconds.
+        """
         pattern = self._select_pattern(self.thinking_times)
         return random.uniform(pattern["min"], pattern["max"])
     
     def get_reading_delay(self, message_length: int = None) -> float:
-        """Get human-like reading delay for incoming messages"""
+        """
+        Get a human-like reading delay for incoming messages.
+        
+        Args:
+            message_length: Length of the message being read (optional).
+        
+        Returns:
+            float: Delay in seconds.
+        """
         pattern = self._select_pattern(self.reading_speeds)
         
         if message_length:
@@ -190,7 +323,12 @@ class HumanBehaviorSimulator:
             return random.uniform(1.0, 3.0)
     
     def get_distraction_delay(self) -> float:
-        """Get random distraction delay (user looked away, etc.)"""
+        """
+        Get a random distraction delay (user looked away, phone call, etc.).
+        
+        Returns:
+            float: Delay in seconds (0 if no distraction occurs).
+        """
         if random.random() < self.distraction_probability:
             return random.uniform(self.distraction_duration["min"], 
                                  self.distraction_duration["max"])
@@ -198,7 +336,20 @@ class HumanBehaviorSimulator:
     
     def get_natural_delay(self, text_length: int = None, is_first: bool = False, 
                           is_last: bool = False) -> float:
-        """Get combined natural delay for a message"""
+        """
+        Get a combined natural delay for a complete message exchange.
+        
+        This combines typing, thinking, reading, and distraction delays to
+        simulate the complete human interaction cycle.
+        
+        Args:
+            text_length: Length of the message.
+            is_first: Whether this is the first chunk (adds thinking time).
+            is_last: Whether this is the last chunk (adds reading time).
+        
+        Returns:
+            float: Total delay in seconds.
+        """
         total_delay = 0
         
         # Initial thinking time before sending
@@ -218,10 +369,38 @@ class HumanBehaviorSimulator:
         return total_delay
 
 
+# ============================================================================
+# Stealth DNS Engine
+# ============================================================================
+
 class StealthDNSEngine:
-    """Main stealth engine combining all human-like behaviors"""
+    """
+    Main stealth engine combining all human-like behaviors.
+    
+    This class integrates the traffic simulator and human behavior simulator
+    into a single interface for use by the DNS sender. It provides methods to
+    start/stop stealth mode and compute natural delays between chunks.
+    
+    The engine can be configured with different intensity levels:
+        - low:    Minimal background traffic, basic delays
+        - normal: Balanced operation (recommended for most use cases)
+        - high:   Aggressive masking, more background traffic
+        - stealth: Maximum stealth, very aggressive masking
+    
+    Attributes:
+        traffic_sim (TrafficSimulator): Background DNS traffic generator.
+        behavior (HumanBehaviorSimulator): Delay calculation engine.
+        background_active (bool): Whether background traffic is active.
+        mode (str): Current stealth mode intensity.
+    """
     
     def __init__(self, dns_server: str = "8.8.8.8"):
+        """
+        Initialize the stealth DNS engine.
+        
+        Args:
+            dns_server: DNS server for background queries (default: 8.8.8.8).
+        """
         self.traffic_sim = TrafficSimulator(dns_server)
         self.behavior = HumanBehaviorSimulator()
         self.background_active = False
@@ -235,7 +414,12 @@ class StealthDNSEngine:
         print("   - Random distraction simulation")
     
     def start_stealth_mode(self, intensity: str = "normal"):
-        """Start stealth mode with given intensity"""
+        """
+        Start stealth mode with the given intensity.
+        
+        Args:
+            intensity: Stealth level ('low', 'normal', 'high', or 'stealth').
+        """
         modes = {
             "low": {"interval": 15.0, "desc": "Low - Minimal background traffic"},
             "normal": {"interval": 8.0, "desc": "Normal - Balanced"},
@@ -253,7 +437,7 @@ class StealthDNSEngine:
         self.background_active = True
     
     def stop_stealth_mode(self):
-        """Stop stealth mode"""
+        """Stop stealth mode and all background activities."""
         if self.background_active:
             self.traffic_sim.stop_background_traffic()
             self.background_active = False
@@ -261,7 +445,17 @@ class StealthDNSEngine:
     
     def get_chunk_delay(self, chunk_index: int, total_chunks: int, 
                         chunk_size: int = None) -> float:
-        """Get natural delay between chunks"""
+        """
+        Get a natural delay between chunks based on human behavior.
+        
+        Args:
+            chunk_index: Index of the current chunk (0-indexed).
+            total_chunks: Total number of chunks in the message.
+            chunk_size: Size of the current chunk (optional).
+        
+        Returns:
+            float: Delay in seconds (capped at 5 seconds).
+        """
         is_first = (chunk_index == 0)
         is_last = (chunk_index == total_chunks - 1)
         
@@ -271,30 +465,48 @@ class StealthDNSEngine:
             is_last=is_last
         )
         
-        # Add random jitter
+        # Add random jitter to avoid predictable patterns
         delay *= random.uniform(0.7, 1.3)
         
         return min(delay, 5.0)  # Cap at 5 seconds
     
     def should_send_fake_query(self) -> bool:
-        """Determine if we should send a fake DNS query"""
+        """
+        Determine whether to send a fake DNS query.
+        
+        Returns:
+            bool: True if a fake query should be sent, False otherwise.
+        """
         intensity = self.traffic_sim.get_traffic_intensity()
         # Higher intensity = more fake queries
         probability = min(0.3, intensity / 30.0)
         return random.random() < probability
     
     def get_stats(self) -> dict:
-        """Get current statistics"""
+        """Get current simulation statistics."""
         stats = self.traffic_sim.get_stats()
         stats["stealth_mode"] = self.background_active
         stats["mode"] = self.mode
         return stats
 
 
-# Test code
+# ============================================================================
+# Test Code
+# ============================================================================
+
 if __name__ == "__main__":
+    """
+    Standalone test routine for the stealth DNS engine.
+    
+    This test verifies:
+        1. Engine initialization
+        2. Stealth mode activation
+        3. Human-like delay calculations
+        4. Background traffic generation
+        5. Clean shutdown
+    """
     print("=" * 60)
-    print("🕵️ Stealth DNS Engine Test")
+    print("Stealth DNS Engine Test")
     print("=" * 60)
     
     # Create engine
@@ -303,20 +515,20 @@ if __name__ == "__main__":
     # Start stealth mode
     stealth.start_stealth_mode("normal")
     
-    # Simulate delays
-    print("\n📊 Simulated human delays for a 10-chunk message:")
+    # Simulate delays for a 10-chunk message
+    print("\nSimulated human delays for a 10-chunk message:")
     for i in range(10):
         delay = stealth.get_chunk_delay(i, 10, chunk_size=random.randint(20, 50))
         print(f"  Chunk {i+1:2d}: {delay:.3f}s")
     
-    # Show stats
-    print(f"\n📊 Traffic stats: {stealth.get_stats()}")
+    # Show statistics
+    print(f"\nTraffic statistics: {stealth.get_stats()}")
     
-    # Run for a few seconds
-    print("\n⏳ Running background traffic for 10 seconds...")
+    # Run background traffic for a few seconds
+    print("\nRunning background traffic for 10 seconds...")
     time.sleep(10)
     
-    # Stop
+    # Stop stealth mode
     stealth.stop_stealth_mode()
     
-    print("\n✅ Stealth DNS Engine test completed!")
+    print("\nStealth DNS Engine test completed successfully!")

@@ -1,0 +1,36 @@
+# Environment variables (sensitive data!)
+.env
+.env.local
+.env.*.local
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Keys (cryptographic keys - very sensitive!)
+*.b64
+*.key
+*.pem
+*.crt
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# Voice files (large)
+received_voices/*.wav
+voice_*.wav
+
+# OS files
+.DS_Store
+Thumbs.db
