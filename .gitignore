@@ -37,3 +37,4 @@ env/
 .DS_Store
 Thumbs.db
 desktop.ini
+git-filter-repo.py
