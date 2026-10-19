@@ -21,8 +21,8 @@ sounddevice>=0.4.6
 soundfile>=0.12.1
 numpy>=1.24.0
 
-# Web Server (optional)
+
 eventlet>=0.33.0
 
-# Stealth mode (optional - install in development mode)
+
 # pip install -e .
